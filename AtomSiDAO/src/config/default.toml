@@ -1,0 +1,30 @@
+# Default configuration for AtomSi DAO
+
+[dao]
+name = "AtomSi DAO"
+description = "A decentralized autonomous organization built with Rust"
+governance_token = "ATOM"
+
+[governance]
+voting_period_days = 7
+quorum_percentage = 40
+majority_percentage = 51
+proposal_threshold = 1000
+
+[blockchain]
+network = "ethereum"
+rpc_url = "https://mainnet.infura.io/v3/your-infura-key"
+chain_id = 1
+
+[treasury]
+signers = 3
+threshold = 2
+spending_limit = 10000
+
+[database]
+url = "postgres://postgres:postgres@localhost:5432/atomsi_dao"
+max_connections = 10
+
+[api]
+address = "127.0.0.1:8080"
+enable_cors = true 

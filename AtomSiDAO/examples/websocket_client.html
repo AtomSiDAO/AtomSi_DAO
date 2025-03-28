@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AtomSi DAO WebSocket Client</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        button, select, input {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            background-color: white;
+            font-size: 14px;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .connected {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .disconnected {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        .connecting {
+            background-color: #fff8e1;
+            color: #f57f17;
+        }
+        
+        .event-list {
+            border: 1px solid #eee;
+            border-radius: 4px;
+            height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        
+        .event {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .event-time {
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+        
+        .event-type {
+            color: #2980b9;
+        }
+        
+        .event-data {
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 14px;
+            color: #333;
+            background-color: #f7f7f7;
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .filters {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .filter-chip {
+            padding: 5px 10px;
+            border-radius: 16px;
+            background-color: #e0e0e0;
+            display: inline-flex;
+            align-items: center;
+            font-size: 14px;
+        }
+        
+        .filter-chip.active {
+            background-color: #bbdefb;
+            color: #1565c0;
+        }
+        
+        .filter-chip input {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AtomSi DAO WebSocket Client</h1>
+        
+        <div class="status disconnected" id="status">Disconnected</div>
+        
+        <div class="controls">
+            <input type="text" id="serverUrl" value="ws://localhost:3000/ws" placeholder="WebSocket URL" style="width: 250px;">
+            <button id="connectBtn">Connect</button>
+            <button id="disconnectBtn" disabled>Disconnect</button>
+            <button id="clearBtn">Clear Events</button>
+        </div>
+        
+        <div class="filters">
+            <div class="filter-chip active">
+                <input type="checkbox" id="filterAll" checked>
+                <label for="filterAll">All Events</label>
+            </div>
+            <div class="filter-chip">
+                <input type="checkbox" id="filterProposal">
+                <label for="filterProposal">Proposals</label>
+            </div>
+            <div class="filter-chip">
+                <input type="checkbox" id="filterTransaction">
+                <label for="filterTransaction">Transactions</label>
+            </div>
+            <div class="filter-chip">
+                <input type="checkbox" id="filterMember">
+                <label for="filterMember">Members</label>
+            </div>
+            <div class="filter-chip">
+                <input type="checkbox" id="filterActivity">
+                <label for="filterActivity">Activities</label>
+            </div>
+        </div>
+        
+        <h2>Events</h2>
+        <div class="event-list" id="eventList"></div>
+    </div>
+    
+    <script>
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const serverUrlInput = document.getElementById('serverUrl');
+        const eventListEl = document.getElementById('eventList');
+        const filterAllCheckbox = document.getElementById('filterAll');
+        const filterChips = document.querySelectorAll('.filter-chip');
+        
+        // WebSocket connection
+        let socket = null;
+        
+        // Event filters
+        const filters = {
+            all: true,
+            proposal: false,
+            transaction: false,
+            member: false,
+            activity: false
+        };
+        
+        // Connect to WebSocket server
+        function connect() {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                return;
+            }
+            
+            const url = serverUrlInput.value;
+            
+            statusEl.textContent = 'Connecting...';
+            statusEl.className = 'status connecting';
+            
+            try {
+                socket = new WebSocket(url);
+                
+                socket.onopen = function() {
+                    statusEl.textContent = 'Connected';
+                    statusEl.className = 'status connected';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    
+                    addEvent({
+                        type: 'system',
+                        message: 'Connected to server'
+                    });
+                };
+                
+                socket.onclose = function() {
+                    statusEl.textContent = 'Disconnected';
+                    statusEl.className = 'status disconnected';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    
+                    addEvent({
+                        type: 'system',
+                        message: 'Disconnected from server'
+                    });
+                    
+                    socket = null;
+                };
+                
+                socket.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    statusEl.textContent = 'Error: ' + error.message;
+                    statusEl.className = 'status disconnected';
+                    
+                    addEvent({
+                        type: 'error',
+                        message: 'WebSocket error: ' + error.message
+                    });
+                };
+                
+                socket.onmessage = function(event) {
+                    console.log('Received message:', event.data);
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleEvent(data);
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
+                        addEvent({
+                            type: 'error',
+                            message: 'Failed to parse message: ' + e.message,
+                            data: event.data
+                        });
+                    }
+                };
+            } catch (error) {
+                console.error('Connection error:', error);
+                statusEl.textContent = 'Error: ' + error.message;
+                statusEl.className = 'status disconnected';
+                
+                addEvent({
+                    type: 'error',
+                    message: 'Connection error: ' + error.message
+                });
+            }
+        }
+        
+        // Disconnect from WebSocket server
+        function disconnect() {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        }
+        
+        // Clear all events
+        function clearEvents() {
+            eventListEl.innerHTML = '';
+        }
+        
+        // Handle incoming WebSocket event
+        function handleEvent(data) {
+            if (data.type === 'welcome') {
+                addEvent({
+                    type: 'welcome',
+                    message: data.message,
+                    client_id: data.client_id,
+                    authenticated: data.authenticated
+                });
+                return;
+            }
+            
+            // Regular event with event_type field
+            if (data.event_type) {
+                addEvent({
+                    type: data.event_type,
+                    timestamp: data.timestamp,
+                    data: data.data
+                });
+            } else {
+                // Echo or other message
+                addEvent({
+                    type: 'message',
+                    data: data
+                });
+            }
+        }
+        
+        // Add event to the event list
+        function addEvent(event) {
+            // Check if the event should be displayed based on filters
+            if (!shouldShowEvent(event)) {
+                return;
+            }
+            
+            const eventEl = document.createElement('div');
+            eventEl.className = 'event';
+            
+            const eventHeader = document.createElement('div');
+            eventHeader.className = 'event-header';
+            
+            const eventType = document.createElement('span');
+            eventType.className = 'event-type';
+            
+            const eventTime = document.createElement('span');
+            eventTime.className = 'event-time';
+            
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            eventTime.textContent = timeStr;
+            
+            const eventData = document.createElement('div');
+            eventData.className = 'event-data';
+            
+            // Set event type and data based on the event
+            switch (event.type) {
+                case 'system':
+                    eventType.textContent = 'System';
+                    eventData.textContent = event.message;
+                    break;
+                    
+                case 'error':
+                    eventType.textContent = 'Error';
+                    eventData.textContent = event.message;
+                    if (event.data) {
+                        eventData.textContent += '\n' + event.data;
+                    }
+                    break;
+                    
+                case 'welcome':
+                    eventType.textContent = 'Welcome';
+                    eventData.textContent = `${event.message}\nClient ID: ${event.client_id}\nAuthenticated: ${event.authenticated}`;
+                    break;
+                    
+                case 'message':
+                    eventType.textContent = 'Message';
+                    eventData.textContent = JSON.stringify(event.data, null, 2);
+                    break;
+                    
+                default:
+                    // For regular events with type from server
+                    eventType.textContent = formatEventType(event.type);
+                    
+                    let dataText = '';
+                    if (event.timestamp) {
+                        dataText += `Time: ${new Date(event.timestamp).toLocaleString()}\n`;
+                    }
+                    
+                    if (event.data) {
+                        dataText += JSON.stringify(event.data, null, 2);
+                    }
+                    
+                    eventData.textContent = dataText;
+                    break;
+            }
+            
+            eventHeader.appendChild(eventType);
+            eventHeader.appendChild(eventTime);
+            
+            eventEl.appendChild(eventHeader);
+            eventEl.appendChild(eventData);
+            
+            eventListEl.prepend(eventEl);
+        }
+        
+        // Format event type for display
+        function formatEventType(type) {
+            if (typeof type !== 'string') {
+                return String(type);
+            }
+            
+            // Convert snake_case or camelCase to Title Case with spaces
+            return type
+                .replace(/_/g, ' ')
+                .replace(/([A-Z])/g, ' $1')
+                .replace(/^\w/, c => c.toUpperCase())
+                .trim();
+        }
+        
+        // Check if an event should be displayed based on filters
+        function shouldShowEvent(event) {
+            if (filters.all) {
+                return true;
+            }
+            
+            const type = event.type;
+            
+            if (filters.proposal && (
+                type === 'proposal_created' || 
+                type === 'proposal_updated' || 
+                type === 'proposal_voted'
+            )) {
+                return true;
+            }
+            
+            if (filters.transaction && (
+                type === 'transaction_created' || 
+                type === 'transaction_approved' || 
+                type === 'transaction_executed'
+            )) {
+                return true;
+            }
+            
+            if (filters.member && (
+                type === 'member_registered' || 
+                type === 'member_updated'
+            )) {
+                return true;
+            }
+            
+            if (filters.activity && type === 'activity_recorded') {
+                return true;
+            }
+            
+            // Always show system, error, welcome
+            if (type === 'system' || type === 'error' || type === 'welcome' || type === 'message') {
+                return true;
+            }
+            
+            return false;
+        }
+        
+        // Toggle filter chips
+        function toggleFilterChip(event) {
+            const checkbox = event.currentTarget.querySelector('input[type="checkbox"]');
+            const isChecked = checkbox.checked;
+            
+            if (checkbox.id === 'filterAll') {
+                // If "All Events" is checked, uncheck others
+                if (isChecked) {
+                    filters.all = true;
+                    filters.proposal = false;
+                    filters.transaction = false;
+                    filters.member = false;
+                    filters.activity = false;
+                    
+                    document.querySelectorAll('.filter-chip input').forEach(cb => {
+                        if (cb.id !== 'filterAll') {
+                            cb.checked = false;
+                        }
+                    });
+                } else {
+                    // Don't allow unchecking "All Events" if no other filter is selected
+                    const anyOtherChecked = Object.values(filters).some((val, i) => i > 0 && val);
+                    if (!anyOtherChecked) {
+                        checkbox.checked = true;
+                        return;
+                    }
+                    
+                    filters.all = false;
+                }
+            } else {
+                // If any other filter is checked, uncheck "All Events"
+                if (isChecked) {
+                    filterAllCheckbox.checked = false;
+                    filters.all = false;
+                    
+                    // Set the specific filter
+                    if (checkbox.id === 'filterProposal') filters.proposal = true;
+                    if (checkbox.id === 'filterTransaction') filters.transaction = true;
+                    if (checkbox.id === 'filterMember') filters.member = true;
+                    if (checkbox.id === 'filterActivity') filters.activity = true;
+                } else {
+                    // Uncheck the specific filter
+                    if (checkbox.id === 'filterProposal') filters.proposal = false;
+                    if (checkbox.id === 'filterTransaction') filters.transaction = false;
+                    if (checkbox.id === 'filterMember') filters.member = false;
+                    if (checkbox.id === 'filterActivity') filters.activity = false;
+                    
+                    // If no filter is checked, check "All Events"
+                    const anyChecked = Object.values(filters).some((val, i) => i > 0 && val);
+                    if (!anyChecked) {
+                        filterAllCheckbox.checked = true;
+                        filters.all = true;
+                    }
+                }
+            }
+            
+            // Update filter chip appearance
+            filterChips.forEach(chip => {
+                const cb = chip.querySelector('input[type="checkbox"]');
+                if (cb.checked) {
+                    chip.classList.add('active');
+                } else {
+                    chip.classList.remove('active');
+                }
+            });
+        }
+        
+        // Add event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        clearBtn.addEventListener('click', clearEvents);
+        
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', toggleFilterChip);
+        });
+        
+        // Auto-connect if URL includes autoconnect=true
+        if (window.location.search.includes('autoconnect=true')) {
+            connect();
+        }
+    </script>
+</body>
+</html> 
