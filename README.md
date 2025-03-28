@@ -1,6 +1,7 @@
 # AtomSi DAO
 
 <div align="center">
+  ![AtomSi DAO Logo](https://raw.githubusercontent.com/AtomSiDAO/AtomSi_DAO/main/atomsi-dao-logo-v12.jpg)
   <br><br>
   <a href="https://crates.io/crates/atomsidao"><img src="https://img.shields.io/crates/v/atomsidao.svg" alt="Crates.io"></a>
   <a href="https://docs.rs/atomsidao"><img src="https://docs.rs/atomsidao/badge.svg" alt="Documentation"></a>
