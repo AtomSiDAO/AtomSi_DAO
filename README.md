@@ -3,7 +3,6 @@
 <div align="center">
   <br><br>
   <a href="https://crates.io/crates/atomsidao"><img src="https://img.shields.io/crates/v/atomsidao.svg" alt="Crates.io"></a>
-  <a href="https://github.com/atomsidao/atomsidao/actions"><img src="https://github.com/atomsidao/atomsidao/workflows/CI/badge.svg" alt="CI Status"></a>
   <a href="https://docs.rs/atomsidao"><img src="https://docs.rs/atomsidao/badge.svg" alt="Documentation"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/rust-1.60%2B-orange.svg" alt="Rust: 1.60+">
