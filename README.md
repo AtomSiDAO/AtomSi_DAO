@@ -182,7 +182,7 @@ AtomSi DAO supports the following databases:
 
 Currently supported blockchains:
 
-- Ethereum
+- Solana
 
 ## Development
 
